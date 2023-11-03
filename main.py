@@ -4,7 +4,7 @@ from fastapi import FastAPI, Depends, Request
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
-from database import SessionLocal, engine
+from database import SessionLocal
 from model import Customer, Transaction
 
 
@@ -52,11 +52,33 @@ app = FastAPI()
 #     )
 
 
+@app.post("/customerName")
+async def customer_name(request: Request, db: Session = Depends(get_database_session)):
+    request_body = await request.json()
+
+    customer = db.query(Customer).filter(Customer.id == request_body['customer_id']).first()
+    if customer is not None:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "successful": True,
+                "name": customer.name
+            }
+        )
+    else:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "successful": False,
+                "message": "El cliente de la transacción no existe."
+            }
+        )
+
 @app.post("/transaction")
 async def create_transaction(request: Request, db: Session = Depends(get_database_session)):
     request_body = await request.json()
 
-    customer = db.query(Customer).filter(Customer.id == request_body['client_id']).first()
+    customer = db.query(Customer).filter(Customer.id == request_body['customer_id']).first()
     if customer is not None:
         if customer.frequent:
             if customer.points > 0:
@@ -69,7 +91,7 @@ async def create_transaction(request: Request, db: Session = Depends(get_databas
                 transaction = Transaction(
                     type="CANJEAR",
                     day=datetime.datetime.now(),
-                    client_id=request_body['client_id']
+                    client_id=request_body['customer_id']
                 )
 
                 db.add(transaction)
@@ -84,14 +106,14 @@ async def create_transaction(request: Request, db: Session = Depends(get_databas
                     }
                 )
             else :
-                customer.points = request_body['galones'] / 5
+                customer.points = request_body['gallons'] / 5
                 db.commit()
                 db.refresh(customer)
 
                 transaction = Transaction(
                     type="ACUMULAR",
                     day=datetime.datetime.now(),
-                    client_id=request_body['client_id']
+                    client_id=request_body['customer_id']
                 )
 
                 db.add(transaction)
@@ -109,7 +131,7 @@ async def create_transaction(request: Request, db: Session = Depends(get_databas
             transaction = Transaction(
                 type="SIMPLE",
                 day=datetime.datetime.now(),
-                client_id=request_body['client_id']
+                client_id=request_body['customer_id']
             )
 
             db.add(transaction)
